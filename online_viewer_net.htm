@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#10121d" />
+  <title>NEON MAZE — Pacman</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+    :root { --ink:#f9f8ff; --muted:#9ca2bd; --panel:rgba(22,25,42,.74); --line:rgba(255,255,255,.1); --yellow:#ffe45c; --blue:#5664ff; --cyan:#69eeff; --danger:#ff627b; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; color:var(--ink); background:#10121d; font-family:Outfit,system-ui,sans-serif; overflow-x:hidden; }
+    body::before, body::after { content:""; position:fixed; pointer-events:none; z-index:-1; border-radius:50%; filter:blur(2px); }
+    body::before { width:42rem; height:42rem; top:-20rem; left:-16rem; background:radial-gradient(circle,rgba(86,100,255,.25),transparent 67%); }
+    body::after { width:38rem; height:38rem; right:-17rem; bottom:-16rem; background:radial-gradient(circle,rgba(255,102,180,.15),transparent 70%); }
+    button { font:inherit; color:inherit; border:0; cursor:pointer; }
+    .app { width:min(1120px,calc(100% - 32px)); min-height:100vh; margin:auto; padding:28px 0 34px; display:flex; flex-direction:column; gap:22px; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:14px; }
+    .brand { display:flex; align-items:center; gap:12px; letter-spacing:.08em; font-weight:800; font-size:18px; }
+    .brand-mark { width:31px; height:31px; border-radius:50%; background:conic-gradient(from 44deg,var(--yellow) 0 292deg,transparent 292deg); box-shadow:0 0 18px rgba(255,228,92,.45); }
+    .brand span { color:var(--yellow); }
+    .pill { border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--muted); border-radius:999px; padding:8px 13px; font:500 11px/1 "DM Mono",monospace; letter-spacing:.08em; }
+    .game-layout { display:grid; grid-template-columns:minmax(0,1fr) 270px; gap:22px; align-items:start; }
+    .game-card, .side-card { background:var(--panel); border:1px solid var(--line); box-shadow:0 20px 55px rgba(0,0,0,.22); backdrop-filter:blur(18px); }
+    .game-card { border-radius:24px; padding:18px; overflow:hidden; }
+    .board-wrap { position:relative; aspect-ratio:21 / 17; overflow:hidden; border-radius:15px; background:#080914; border:1px solid rgba(132,145,255,.24); touch-action:none; }
+    canvas { width:100%; height:100%; display:block; }
+    .board-wrap::after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(110deg,rgba(255,255,255,.04),transparent 28%,transparent 72%,rgba(105,238,255,.035)); }
+    .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:18px; background:rgba(8,9,20,.72); text-align:center; transition:.22s ease; z-index:2; }
+    .overlay.hidden { opacity:0; pointer-events:none; }
+    .overlay-card { max-width:360px; }
+    .eyebrow { color:var(--cyan); font:500 11px/1 "DM Mono",monospace; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { font-size:clamp(29px,5vw,45px); letter-spacing:-.055em; line-height:.96; margin:10px 0 12px; }
+    .overlay p { color:var(--muted); margin:0 auto 21px; line-height:1.45; font-size:15px; }
+    .primary { padding:13px 19px; border-radius:12px; background:var(--yellow); color:#23230b; font-weight:800; box-shadow:0 6px 22px rgba(255,228,92,.23); transition:transform .15s,box-shadow .15s; }
+    .primary:hover { transform:translateY(-2px); box-shadow:0 9px 28px rgba(255,228,92,.32); }
+    .stats { display:grid; grid-template-columns:1fr 1.15fr 1fr; border-top:1px solid var(--line); margin-top:16px; padding-top:15px; gap:8px; }
+    .stat { padding:0 10px; border-right:1px solid var(--line); }
+    .stat:last-child { border-right:0; text-align:right; }
+    .stat:nth-child(2) { text-align:center; }
+    .stat-label { color:var(--muted); display:block; font:500 10px/1 "DM Mono",monospace; letter-spacing:.11em; margin-bottom:6px; }
+    .stat-value { font-size:22px; font-weight:700; letter-spacing:-.04em; }
+    #lives { color:var(--yellow); letter-spacing:2px; }
+    .side { display:flex; flex-direction:column; gap:14px; }
+    .side-card { border-radius:18px; padding:19px; }
+    .side-title { display:flex; align-items:center; justify-content:space-between; color:var(--muted); font:500 11px/1 "DM Mono",monospace; letter-spacing:.12em; text-transform:uppercase; margin-bottom:17px; }
+    .best { font-size:33px; line-height:1; font-weight:700; letter-spacing:-.06em; }
+    .best small { display:block; color:var(--muted); font:500 11px/1.4 "DM Mono",monospace; letter-spacing:.04em; margin-top:7px; }
+    .legend { display:flex; flex-direction:column; gap:12px; }
+    .legend-row { display:flex; gap:11px; align-items:center; color:#d3d6e8; font-size:14px; }
+    .legend-mark { width:12px; height:12px; border-radius:50%; background:var(--danger); box-shadow:0 0 9px currentColor; }
+    .legend-mark.pink { color:#ff79c6; background:#ff79c6; } .legend-mark.cyan { color:var(--cyan); background:var(--cyan); }
+    .legend-mark.blue { color:var(--blue); background:var(--blue); }
+    .divider { height:1px; background:var(--line); margin:16px 0; }
+    .instruction { color:var(--muted); font-size:13px; line-height:1.52; margin:0; }
+    kbd { display:inline-flex; align-items:center; justify-content:center; min-width:22px; border:1px solid rgba(255,255,255,.16); border-bottom-color:rgba(255,255,255,.3); border-radius:5px; padding:2px 4px; color:#e8eaff; font:500 10px/1.2 "DM Mono",monospace; }
+    .new-game { width:100%; padding:12px; border-radius:11px; color:#e6e8fa; background:rgba(255,255,255,.07); border:1px solid var(--line); font-weight:600; transition:background .15s; }
+    .new-game:hover { background:rgba(255,255,255,.12); }
+    .controls { display:none; grid-template-columns:repeat(3,48px); grid-template-rows:42px 42px; justify-content:center; gap:5px; margin-top:18px; }
+    .control { border:1px solid var(--line); background:rgba(255,255,255,.06); border-radius:10px; color:#fff; font-size:17px; }
+    .control:active { background:rgba(255,228,92,.22); transform:scale(.95); }
+    .up { grid-column:2; } .left { grid-column:1; grid-row:2; } .down { grid-column:2; grid-row:2; } .right { grid-column:3; grid-row:2; }
+    .footer { color:#747b99; text-align:center; font:500 11px/1.5 "DM Mono",monospace; letter-spacing:.04em; }
+    @media (max-width:780px) { .app { width:min(100% - 22px,680px); padding-top:18px; } .game-layout { grid-template-columns:1fr; } .side { display:grid; grid-template-columns:1fr 1fr; } .side-card:last-child { grid-column:span 2; } .controls { display:grid; } }
+    @media (max-width:460px) { .brand { font-size:15px; } .pill { display:none; } .game-card { padding:10px; border-radius:18px; } .board-wrap { border-radius:11px; } .side { grid-template-columns:1fr; } .side-card:last-child { grid-column:span 1; } .stats { margin-top:11px; padding-top:12px; } .stat { padding:0 4px; } .stat-value { font-size:19px; } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand"><i class="brand-mark"></i>NEON <span>MAZE</span></div>
+      <div class="pill">ARCADE // 01</div>
+    </header>
+    <section class="game-layout">
+      <div class="game-card">
+        <div class="board-wrap" id="boardWrap">
+          <canvas id="game" width="840" height="680" aria-label="Pacman game board"></canvas>
+          <div class="overlay" id="overlay">
+            <div class="overlay-card">
+              <div class="eyebrow" id="overlayEyebrow">READY PLAYER ONE</div>
+              <h1 id="overlayTitle">Own the maze.</h1>
+              <p id="overlayText">Eat every pulse, dodge the crew, and grab a power orb to turn the chase around.</p>
+              <button class="primary" id="playButton">Start game <span aria-hidden="true">→</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat"><span class="stat-label">Score</span><span class="stat-value" id="score">00000</span></div>
+          <div class="stat"><span class="stat-label">Stage</span><span class="stat-value">01 <em id="mode" style="font-style:normal;color:#9ca2bd;font-size:12px">• READY</em></span></div>
+          <div class="stat"><span class="stat-label">Lives</span><span class="stat-value" id="lives">● ● ●</span></div>
+        </div>
+        <div class="controls" aria-label="Touch controls">
+          <button class="control up" data-dir="up">↑</button><button class="control left" data-dir="left">←</button><button class="control down" data-dir="down">↓</button><button class="control right" data-dir="right">→</button>
+        </div>
+      </div>
+      <aside class="side">
+        <section class="side-card">
+          <div class="side-title">Personal best <span>★</span></div>
+          <div class="best" id="best">00000<small>saved in this browser</small></div>
+          <div class="divider"></div>
+          <button class="new-game" id="newGame">↻ &nbsp; New game</button>
+        </section>
+        <section class="side-card">
+          <div class="side-title">Ghost signals <span>04</span></div>
+          <div class="legend"><div class="legend-row"><i class="legend-mark"></i>Vanta — persistent</div><div class="legend-row"><i class="legend-mark pink"></i>Nova — unpredictable</div><div class="legend-row"><i class="legend-mark cyan"></i>Echo — quick to corner</div><div class="legend-row"><i class="legend-mark blue"></i>Orbit — always nearby</div></div>
+        </section>
+        <section class="side-card">
+          <div class="side-title">How to play <span>⌘</span></div>
+          <p class="instruction">Use <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>. On touch, swipe the board or use the controls.</p>
+        </section>
+      </aside>
+    </section>
+    <div class="footer">POWER ORBS LAST 7 SECONDS · CLEAR THE FIELD TO WIN</div>
+  </main>
+  <script>
+  (() => {
+    const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score'), livesEl = document.getElementById('lives'), modeEl = document.getElementById('mode');
+    const bestEl = document.getElementById('best'), overlay = document.getElementById('overlay');
+    const overlayEyebrow = document.getElementById('overlayEyebrow'), overlayTitle = document.getElementById('overlayTitle'), overlayText = document.getElementById('overlayText'), playButton = document.getElementById('playButton');
+    const COLS = 21, ROWS = 17, TILE = 40;
+    const D = { left:{x:-1,y:0,a:Math.PI}, right:{x:1,y:0,a:0}, up:{x:0,y:-1,a:-Math.PI/2}, down:{x:0,y:1,a:Math.PI/2} };
+    const opposite = {left:'right',right:'left',up:'down',down:'up'};
+    let grid, player, ghosts, score, lives, running = false, won = false, last = 0, powerUntil = 0, ghostChain = 0, audio;
+    // Some file previews block localStorage. Scores are optional, so never let
+    // that browser setting prevent the game itself from starting.
+    const storage = {
+      get(key) { try { return globalThis.localStorage?.getItem(key); } catch (_) { return null; } },
+      set(key, value) { try { globalThis.localStorage?.setItem(key, value); } catch (_) {} }
+    };
+    let best = Number(storage.get('neonMazeBest') || 0);
+    bestEl.firstChild.nodeValue = String(best).padStart(5,'0');
+
+    function makeMaze() {
+      grid = Array.from({length:ROWS}, (_,y) => Array.from({length:COLS}, (_,x) => (x===0||y===0||x===COLS-1||y===ROWS-1) ? '#' : '.'));
+      const wall = (x,y) => { if (x>0&&x<COLS-1&&y>0&&y<ROWS-1) grid[y][x]='#'; };
+      const h = (y,a,b,open=[]) => { for(let x=a;x<=b;x++) if(!open.includes(x)) wall(x,y); };
+      const v = (x,a,b,open=[]) => { for(let y=a;y<=b;y++) if(!open.includes(y)) wall(x,y); };
+      h(3,2,7,[4]); h(3,13,18,[16]); v(4,1,3,[2]); v(16,1,3,[2]);
+      v(10,1,5,[3]); h(6,2,7,[5]); h(6,13,18,[15]);
+      v(7,6,10,[8]); v(13,6,10,[8]); h(9,2,5,[3]); h(9,15,18,[17]);
+      h(12,3,8,[6]); h(12,12,17,[14]); v(4,12,15,[14]); v(16,12,15,[14]);
+      h(14,7,13,[10]); v(10,11,14,[12]);
+      [[10,13],[10,8],[9,8],[11,8],[10,7]].forEach(([x,y]) => grid[y][x]=' ');
+      [[1,1],[19,1],[1,15],[19,15]].forEach(([x,y]) => grid[y][x]='o');
+    }
+    function resetPositions() {
+      player = {x:10.5,y:15.5,dir:'left',want:'left',speed:6.7,mouth:0};
+      const set = [
+        [10.5,7.5,'left','#ff627b','Vanta',0], [9.5,8.5,'right','#ff79c6','Nova',.35],
+        [11.5,8.5,'left','#69eeff','Echo',.7], [10.5,8.5,'up','#8290ff','Orbit',1.05]
+      ];
+      ghosts = set.map(([x,y,dir,color,name,delay]) => ({x,y,dir,color,name,delay,homeX:x,homeY:y,dead:0,speed:5.35}));
+    }
+    function newGame() {
+      makeMaze(); resetPositions(); score=0; lives=3; powerUntil=0; ghostChain=0; won=false; running=false; updateHud(); showOverlay('READY PLAYER ONE','Own the maze.','Eat every pulse, dodge the crew, and grab a power orb to turn the chase around.','Start game →'); draw();
+    }
+    function startGame() { if (won || lives<=0) newGame(); running=true; overlay.classList.add('hidden'); modeEl.textContent='• LIVE'; last=performance.now(); requestAnimationFrame(loop); tone(440,.035,.03); }
+    function showOverlay(eyebrow,title,text,button) { overlayEyebrow.textContent=eyebrow; overlayTitle.textContent=title; overlayText.textContent=text; playButton.textContent=button; overlay.classList.remove('hidden'); }
+    function updateHud() { scoreEl.textContent=String(score).padStart(5,'0'); livesEl.textContent=Array.from({length:lives},()=> '●').join(' ') || '—'; if(score>best){best=score;storage.set('neonMazeBest',best);bestEl.firstChild.nodeValue=String(best).padStart(5,'0');} }
+    function cell(x,y) { return grid[Math.floor(y)]?.[Math.floor(x)] ?? '#'; }
+    function canMove(x,y,dir) { const d=D[dir]; return cell(x+d.x*.58,y+d.y*.58) !== '#'; }
+    function center(entity) { return {x:Math.floor(entity.x)+.5,y:Math.floor(entity.y)+.5}; }
+    function aligned(e) { const c=center(e); return Math.abs(e.x-c.x)<.0001 && Math.abs(e.y-c.y)<.0001; }
+    function advance(e, dt, onCenter) {
+      let remaining=e.speed*dt;
+      while(remaining>.0001) {
+        if(aligned(e)) { if(onCenter()===false) return; }
+        const d=D[e.dir];
+        // Find the *next* cell centre in the active direction. The small
+        // offset keeps an actor already on a centre moving forward instead
+        // of selecting its current position and freezing the game loop.
+        const targetX=d.x>0?Math.floor(e.x+.50001)+.5:d.x<0?Math.ceil(e.x-.50001)-.5:e.x;
+        const targetY=d.y>0?Math.floor(e.y+.50001)+.5:d.y<0?Math.ceil(e.y-.50001)-.5:e.y;
+        const distance=Math.abs(targetX-e.x)+Math.abs(targetY-e.y);
+        if(remaining>=distance) { e.x=targetX;e.y=targetY;remaining-=distance; }
+        else { e.x+=d.x*remaining;e.y+=d.y*remaining;remaining=0; }
+      }
+    }
+    function movePlayer(dt) {
+      advance(player,dt,()=>{ if(canMove(player.x,player.y,player.want)) player.dir=player.want; return canMove(player.x,player.y,player.dir); }); player.mouth+=dt*13;
+      const here=cell(player.x,player.y); if(here==='.'||here==='o') { grid[Math.floor(player.y)][Math.floor(player.x)]=' '; score+=here==='o'?50:10; if(here==='o'){powerUntil=performance.now()+7000;ghostChain=0;tone(165,.12,.055);} else tone(630,.016,.008); updateHud(); }
+    }
+    function viable(e) { return Object.keys(D).filter(dir=>canMove(e.x,e.y,dir)); }
+    function chooseGhost(g) {
+      let choices=viable(g).filter(d=>d!==opposite[g.dir]); if(!choices.length) choices=viable(g); if(!choices.length)return;
+      const powered=performance.now()<powerUntil;
+      const target = powered ? {x:COLS/2,y:ROWS/2} : player;
+      const personality = g.name==='Nova' ? Math.random()*5 : 0;
+      choices.sort((a,b)=>{ const da=D[a],db=D[b]; const aa=Math.hypot(g.x+da.x-target.x,g.y+da.y-target.y)+Math.random()*personality; const bb=Math.hypot(g.x+db.x-target.x,g.y+db.y-target.y)+Math.random()*personality; return (powered?bb-aa:aa-bb); });
+      g.dir=choices[0];
+    }
+    function moveGhost(g,dt) {
+      if(g.dead>0){g.dead-=dt;if(g.dead<=0){g.x=g.homeX;g.y=g.homeY;g.dir='up';}return;}
+      if(g.delay>0){g.delay-=dt;return;} advance(g,dt,()=>{chooseGhost(g);return true;});
+    }
+    function collide() { for(const g of ghosts){ if(g.dead<=0&&g.delay<=0&&Math.hypot(player.x-g.x,player.y-g.y)<.62){ if(performance.now()<powerUntil){g.dead=1.6;score+=200*(2**ghostChain++);updateHud();tone(90,.18,.08); } else { lives--;updateHud();running=false;modeEl.textContent='• CAUGHT'; tone(90,.32,.1); if(lives>0){showOverlay('SIGNAL LOST','They got you.','Take a breath. The maze is still yours.','Continue →');resetPositions();} else {showOverlay('RUN OVER','Final score: '+String(score).padStart(5,'0'),'One more run? Your personal best is saved here.','Play again →');} } return; } } }
+    function checkWin(){ if(!grid.some(row=>row.includes('.')||row.includes('o'))){running=false;won=true;modeEl.textContent='• CLEAR';score+=500;updateHud();tone(740,.16,.06);setTimeout(()=>tone(990,.23,.06),120);showOverlay('MAZE CLEARED','Perfect run.','Bonus +500. You left no pulse behind.','Play again →');} }
+    function loop(now){ if(!running) {draw();return;} const dt=Math.min(.032,(now-last)/1000);last=now; movePlayer(dt);ghosts.forEach(g=>moveGhost(g,dt));collide();checkWin();draw();if(running)requestAnimationFrame(loop); }
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#090b18';ctx.fillRect(0,0,canvas.width,canvas.height);
+      const s=40; ctx.save();
+      for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const v=grid[y][x],px=x*s,py=y*s;if(v==='#'){ctx.fillStyle='#17265e';ctx.fillRect(px+1,py+1,s-2,s-2);ctx.fillStyle='#3f56d7';ctx.fillRect(px+4,py+4,s-8,3);ctx.fillStyle='rgba(105,238,255,.22)';ctx.fillRect(px+4,py+4,3,s-8);}else if(v==='.') {ctx.fillStyle='#f6f2de';ctx.beginPath();ctx.arc(px+s/2,py+s/2,2.4,0,Math.PI*2);ctx.fill();} else if(v==='o'){const pulse=.8+Math.sin(performance.now()/150)*.13;ctx.fillStyle='#fff6bb';ctx.shadowColor='#ffe45c';ctx.shadowBlur=18;ctx.beginPath();ctx.arc(px+s/2,py+s/2,7*pulse,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}}
+      drawPlayer(); ghosts.forEach(drawGhost);ctx.restore();
+      if(performance.now()<powerUntil&&running){ctx.fillStyle='rgba(105,238,255,.035)';ctx.fillRect(0,0,canvas.width,canvas.height);}
+    }
+    function drawPlayer(){const x=player.x*40,y=player.y*40,r=15.2;const opening=.22+(.5+.5*Math.sin(player.mouth))*0.43;ctx.save();ctx.translate(x,y);ctx.rotate(D[player.dir].a);ctx.fillStyle='#ffe45c';ctx.shadowColor='#ffe45c';ctx.shadowBlur=15;ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r,opening,Math.PI*2-opening);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.restore();}
+    function drawGhost(g){if(g.dead>0)return;const x=g.x*40,y=g.y*40,fright=performance.now()<powerUntil;ctx.save();ctx.translate(x,y);ctx.fillStyle=fright?'#3546bb':g.color;ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=13;ctx.beginPath();ctx.arc(0,-4,14,Math.PI,0);ctx.lineTo(14,13);ctx.lineTo(7,9);ctx.lineTo(0,13);ctx.lineTo(-7,9);ctx.lineTo(-14,13);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-5,-3,4.7,0,Math.PI*2);ctx.arc(5,-3,4.7,0,Math.PI*2);ctx.fill();ctx.fillStyle=fright?'#fff':'#172050';const d=D[g.dir];ctx.beginPath();ctx.arc(-5+d.x*1.8,-3+d.y*1.8,2.3,0,Math.PI*2);ctx.arc(5+d.x*1.8,-3+d.y*1.8,2.3,0,Math.PI*2);ctx.fill();ctx.restore();}
+    function tone(freq,duration,volume){try{audio??=new (window.AudioContext||window.webkitAudioContext)();const o=audio.createOscillator(),gain=audio.createGain();o.frequency.value=freq;o.type='sine';gain.gain.setValueAtTime(volume,audio.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);o.connect(gain).connect(audio.destination);o.start();o.stop(audio.currentTime+duration);}catch(e){}}
+    function setDirection(dir){player.want=dir;if(!running&&lives>0&&!won)startGame();}
+    const keyMap={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',a:'left',d:'right',w:'up',s:'down'};
+    addEventListener('keydown',e=>{const dir=keyMap[e.key];if(dir){e.preventDefault();setDirection(dir);}}); playButton.addEventListener('click',startGame);document.getElementById('newGame').addEventListener('click',newGame);document.querySelectorAll('[data-dir]').forEach(b=>b.addEventListener('click',()=>setDirection(b.dataset.dir)));
+    let touchStart;document.getElementById('boardWrap').addEventListener('pointerdown',e=>{touchStart={x:e.clientX,y:e.clientY};});document.getElementById('boardWrap').addEventListener('pointerup',e=>{if(!touchStart)return;const dx=e.clientX-touchStart.x,dy=e.clientY-touchStart.y;if(Math.max(Math.abs(dx),Math.abs(dy))>14)setDirection(Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up'));touchStart=null;});
+    newGame();
+  })();
+  </script>
+</body>
+</html>
